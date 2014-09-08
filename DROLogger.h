@@ -34,21 +34,6 @@ void log_humidity(uint8_t bus, uint8_t *address);
 void log_address(Stream* stream, uint8_t *address);
 int freeRam();
 
-//struct temperature_t
-//{
-//	time_t timestamp;
-//	uint8_t address[8];
-//	double temperature;
-//};
-//
-//struct humidity_t
-//{
-//	time_t timestamp;
-//	uint8_t address[8];
-////	double temperature;
-//	double adc;
-//};
-
 struct record_t
 {
 	time_t timestamp;
