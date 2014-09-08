@@ -25,8 +25,6 @@
 
 
 #define ONEWIRE_BUS_COUNT 2
-#define MAX_TEMPERATURE 5
-#define MAX_HUMIDITY 5
 
 uint64_t log_bus(uint8_t bus);
 void log_temperature(uint8_t bus, uint8_t *address);
