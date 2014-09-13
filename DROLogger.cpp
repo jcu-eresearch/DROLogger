@@ -24,19 +24,26 @@ SoftwareSerial* debug;
 Stream* data;
 
 upload_t upload;
-record_t delim;
+record_t start_delim;
+record_t end_delim;
+
+uint8_t retry_count = 0;
+boolean sleep = false;
+
 
 void setup()
 {
-	uint8_t *buf = (uint8_t *)&delim;
+	uint8_t *buf = (uint8_t *)&start_delim;
+	uint8_t *buf2 = (uint8_t *)&end_delim;
 	for(uint16_t i = 0; i < sizeof(record_t); i++)
 	{
 		buf[i] = i;
+		buf2[sizeof(record_t) - i - 1] = i;
 	}
-	Serial.begin(57600);
+	Serial.begin(9600);
 	data = &Serial;
 	debug = new SoftwareSerial(8,9);
-	debug->begin(9600);
+	debug->begin(57600);
 	debug->println("Starting...");
 	busses[0] = new OneWire(A0);
 	busses[1] = new OneWire(A1);
@@ -44,12 +51,13 @@ void setup()
 	temps[1] = new DallasTemperature(busses[1]);
 	debug->println(freeRam());
 	debug->println(sizeof(record_t));
-
+	Serial.setTimeout(5000);
 }
 
 void loop()
 {
-	data->write((uint8_t*)&delim, sizeof(record_t));
+	sleep = false;
+	data->write((uint8_t*)&start_delim, sizeof(record_t));
 	upload.humidity_count = 0;
 	upload.temperature_count = 0;
 	for(int i = 0; i < ONEWIRE_BUS_COUNT; i++)
@@ -72,10 +80,32 @@ void loop()
 	debug->println();
 	debug->println(freeRam());
 	delay(500);
-	data->write((uint8_t*)&delim, sizeof(record_t));
+	data->write((uint8_t*)&end_delim, sizeof(record_t));
+
+	if(data->find(ACK))
+	{
+		debug->println("Received ACK.");
+
+		sleep = true;
+	}else
+	{
+		debug->println("Failed to receive ACK.");
+		retry_count++;
+		if(retry_count >= MAX_RETRIES)
+		{
+			retry_count = 0;
+			sleep = true;
+		}
+	}
+	if(sleep)
+	{
+		//Power Down
+		debug->println("Powering Down...");
+		delay(5000);
+	}
 }
 
-uint64_t log_bus(uint8_t bus)
+void log_bus(uint8_t bus)
 {
 	busses[bus]->reset_search();
 	uint8_t address[8];

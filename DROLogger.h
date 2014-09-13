@@ -25,8 +25,10 @@
 
 
 #define ONEWIRE_BUS_COUNT 2
+#define MAX_RETRIES 5
+#define ACK "OK"
 
-uint64_t log_bus(uint8_t bus);
+void log_bus(uint8_t bus);
 void log_temperature(uint8_t bus, uint8_t *address);
 void log_humidity(uint8_t bus, uint8_t *address);
 void log_address(Stream* stream, uint8_t *address);
