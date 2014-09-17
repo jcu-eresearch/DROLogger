@@ -18,7 +18,9 @@
 
 OneWire* busses[ONEWIRE_BUS_COUNT];
 DallasTemperature* temps[ONEWIRE_BUS_COUNT];
-time_t temp_sample[ONEWIRE_BUS_COUNT];
+
+AB08XX_I2C* clock;
+PowerGizmo* power;
 
 SoftwareSerial* debug;
 Stream* data;
@@ -50,21 +52,48 @@ void setup()
 	temps[0] = new DallasTemperature(busses[0]);
 	temps[1] = new DallasTemperature(busses[1]);
 	debug->println(freeRam());
+	debug->print("header_t size: ");
+	debug->println(sizeof(header_t));
+	debug->print("record_t size: ");
 	debug->println(sizeof(record_t));
 	Serial.setTimeout(5000);
+
+	clock = new AB08XX_I2C();
+	power = new PowerGizmo(clock);
+	power->set(RTC.get());
 }
 
 void loop()
 {
-	sleep = false;
+
+	if(!repeat(&dro_log, 5, 100))
+	{
+		debug->println("Failed to send data.");
+	}
+	time_t now = power->get();
+	if(power->wakeUpAt((now - (now % LOG_INTERVAL)) + LOG_INTERVAL) == POWERGIZMO_OK)
+	{
+		power->powerDown();
+	}else
+	{
+		if(!repeat(&power_gizmo_error, 5, 100))
+		{
+			debug->println("Failed send power gizmo error.");
+		}
+	}
+}
+
+bool dro_log(int repeat_count)
+{
 	data->write((uint8_t*)&start_delim, sizeof(record_t));
+	header_t header = { DATA, RTC.get(),repeat_count};
+	data->write((uint8_t*)&header, sizeof(header_t));
 	upload.humidity_count = 0;
 	upload.temperature_count = 0;
 	for(int i = 0; i < ONEWIRE_BUS_COUNT; i++)
 	{
 		temps[i]->begin();
 		temps[i]->requestTemperatures();
-		temp_sample[i]=RTC.get();
 	}
 	for(int i = 0; i < ONEWIRE_BUS_COUNT; i++)
 	{
@@ -78,31 +107,22 @@ void loop()
 	debug->print("Humidity Count: ");
 	debug->println(upload.humidity_count);
 	debug->println();
-	debug->println(freeRam());
-	delay(500);
+
 	data->write((uint8_t*)&end_delim, sizeof(record_t));
+	debug->println(freeRam());
 
 	if(data->find(ACK))
 	{
-		debug->println("Received ACK.");
+		debug->println("ACK received.");
+		return true;
+	}
+	debug->println("ACK not received.");
+	return false;
+}
 
-		sleep = true;
-	}else
-	{
-		debug->println("Failed to receive ACK.");
-		retry_count++;
-		if(retry_count >= MAX_RETRIES)
-		{
-			retry_count = 0;
-			sleep = true;
-		}
-	}
-	if(sleep)
-	{
-		//Power Down
-		debug->println("Powering Down...");
-		delay(5000);
-	}
+bool power_gizmo_error(int repeat_count)
+{
+
 }
 
 void log_bus(uint8_t bus)
@@ -137,7 +157,6 @@ void log_temperature(uint8_t bus, uint8_t *address)
 {
 
 	record_t record;
-	record.timestamp = temp_sample[bus];
 	record.value = temps[bus]->getTempC(address);
 	memcpy(&record.address, address, 8);
 	if(temps[bus]->getResolution(address) != TEMP_12_BIT)
@@ -147,7 +166,6 @@ void log_temperature(uint8_t bus, uint8_t *address)
 
 	data->write((uint8_t*)&record, sizeof(record_t));
 
-	debug->print(record.timestamp);
 	debug->print(' ');
 	log_address(debug, address);
 	debug->print(' ');
@@ -165,13 +183,12 @@ void log_humidity(uint8_t bus, uint8_t *address)
 	{
 		humidity.setSleepMode(true);
 	}
-	record.timestamp = RTC.get();
+
 	memcpy(&record.address, address, 8);
 	record.value = humidity.readADC();
 
 	data->write((uint8_t*)&record, sizeof(record_t));
 
-	debug->print(record.timestamp);
 	debug->print(' ');
 	log_address(debug, address);
 	debug->print(' ');
@@ -186,6 +203,19 @@ void log_address(Stream* stream, uint8_t *address)
 	{
 		stream->print(address[i], HEX);
 	}
+}
+
+bool repeat(bool (*func)(int repeat_count), uint32_t count, uint32_t delayms)
+{
+	for(uint32_t i = 0; i < count; i++)
+	{
+		if(func(i))
+		{
+			return true;
+		}
+		delay(delayms);
+	}
+	return false;
 }
 
 int freeRam () {
