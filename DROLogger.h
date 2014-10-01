@@ -26,11 +26,36 @@
 #include "AB08XX_I2C.h"
 #include "PowerGizmo.h"
 
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <avr/power.h>
+
 
 #define ONEWIRE_BUS_COUNT 2
 #define MAX_RETRIES 5
 #define ACK "OK"
 #define LOG_INTERVAL 600
+#define LOG_INTERVAL_THRESHOLD 10
+
+#define ONE_WIRE_BUS_ONE_PIN A0
+#define ONE_WIRE_BUS_TWO_PIN A1
+#define POWER_CONTROL_PIN    A2
+
+#ifndef sleep_bod_disable()
+#define sleep_bod_disable() \
+do { \
+  uint8_t tempreg; \
+  __asm__ __volatile__("in %[tempreg], %[mcucr]" "\n\t" \
+                       "ori %[tempreg], %[bods_bodse]" "\n\t" \
+                       "out %[mcucr], %[tempreg]" "\n\t" \
+                       "andi %[tempreg], %[not_bodse]" "\n\t" \
+                       "out %[mcucr], %[tempreg]" \
+                       : [tempreg] "=&d" (tempreg) \
+                       : [mcucr] "I" _SFR_IO_ADDR(MCUCR), \
+                         [bods_bodse] "i" (_BV(BODS) | _BV(BODSE)), \
+                         [not_bodse] "i" (~_BV(BODSE))); \
+} while (0)
+#endif
 
 
 bool dro_log(int repeat_count);
@@ -40,6 +65,11 @@ void log_bus(uint8_t bus);
 void log_temperature(uint8_t bus, uint8_t *address);
 void log_humidity(uint8_t bus, uint8_t *address);
 void log_address(Stream* stream, uint8_t *address);
+void backup_sleep();
+void power_down_radio();
+void power_up_radio();
+void INT0_ISR();
+time_t wake_up_at(time_t current_time, tmElements_t &alarm);
 
 bool repeat(bool (*func)(int repeat_count), uint32_t count, uint32_t delayms);
 int freeRam();

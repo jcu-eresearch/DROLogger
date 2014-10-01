@@ -31,6 +31,7 @@ record_t end_delim;
 
 uint8_t retry_count = 0;
 boolean sleep = false;
+boolean did_backup_sleep = false;
 
 
 void setup()
@@ -47,8 +48,8 @@ void setup()
 	debug = new SoftwareSerial(8,9);
 	debug->begin(57600);
 	debug->println("Starting...");
-	busses[0] = new OneWire(A0);
-	busses[1] = new OneWire(A1);
+	busses[0] = new OneWire(ONE_WIRE_BUS_ONE_PIN);
+	busses[1] = new OneWire(ONE_WIRE_BUS_TWO_PIN);
 	temps[0] = new DallasTemperature(busses[0]);
 	temps[1] = new DallasTemperature(busses[1]);
 	debug->println(freeRam());
@@ -61,19 +62,33 @@ void setup()
 	clock = new AB08XX_I2C();
 	power = new PowerGizmo(clock);
 	power->set(RTC.get());
+
+	PORTD |= 0x04;
+    DDRD &=~ 0x04;
 }
 
 void loop()
 {
 
+	power_up_radio();
+	digitalWrite(POWER_CONTROL_PIN, HIGH);
 	if(!repeat(&dro_log, 5, 100))
 	{
 		debug->println("Failed to send data.");
 	}
-	time_t now = power->get();
-	if(power->wakeUpAt((now - (now % LOG_INTERVAL)) + LOG_INTERVAL) == POWERGIZMO_OK)
+	digitalWrite(POWER_CONTROL_PIN, LOW);
+	power_down_radio();
+
+	ab08xx_tmElements_t alarm;
+	wake_up_at(power->get(), alarm);
+	if(power->wakeUpAt(alarm) == POWERGIZMO_OK)
 	{
+		did_backup_sleep = false;
 		power->powerDown();
+
+		//If this did not power down we will use on board power management.
+		delay(300);
+		backup_sleep();
 	}else
 	{
 		if(!repeat(&power_gizmo_error, 5, 100))
@@ -83,10 +98,64 @@ void loop()
 	}
 }
 
+void INT0_ISR()
+{
+
+}
+
+void backup_sleep()
+{
+
+	tmElements_t alarm;
+	wake_up_at(RTC.get(), alarm);
+	RTC.writeAlarm(1, alarmModeDateMatch, alarm);
+	attachInterrupt(0, INT0_ISR, FALLING);
+
+    cli();
+    sleep_enable();      // Set sleep enable bit
+    sleep_bod_disable(); // Disable brown out detection during sleep. Saves more power
+    sei();
+
+    //delay(30); //This delay is required to allow print to complete
+
+    //Shut down all peripherals like ADC before sleep. Refer Atmega328 manual
+    power_all_disable(); //This shuts down ADC, TWI, SPI, Timers and USART
+    sleep_cpu();         // Sleep the CPU as per the mode set earlier(power down)
+    sleep_disable();     // Wakes up sleep and clears enable bit. Before this ISR would have executed
+    power_all_enable();  //This shuts enables ADC, TWI, SPI, Timers and USART
+    delay(10); //This delay is required to allow CPU to stabilize
+
+	did_backup_sleep = true;
+	RTC.clearAlarmFlag(3);
+	power->set(RTC.get());
+}
+
+time_t wake_up_at(time_t current_time, tmElements_t &alarm)
+{
+
+	time_t waking_at = current_time - (current_time % LOG_INTERVAL) + LOG_INTERVAL;
+	if((waking_at - current_time) < LOG_INTERVAL_THRESHOLD)
+	{
+		waking_at += LOG_INTERVAL;
+	}
+	breakTime(waking_at, alarm);
+	return waking_at;
+}
+
+void power_down_radio()
+{
+
+}
+
+void power_up_radio()
+{
+
+}
+
 bool dro_log(int repeat_count)
 {
 	data->write((uint8_t*)&start_delim, sizeof(record_t));
-	header_t header = { DATA, RTC.get(),repeat_count};
+	header_t header = { DATA, RTC.get(), repeat_count};
 	data->write((uint8_t*)&header, sizeof(header_t));
 	upload.humidity_count = 0;
 	upload.temperature_count = 0;
