@@ -59,12 +59,16 @@ void setup()
 	debug->println(sizeof(record_t));
 	Serial.setTimeout(5000);
 
-	clock = new AB08XX_I2C();
+//	clock = new AB08XX_I2C();
+	clock = NULL;
 	power = new PowerGizmo(clock);
 	power->set(RTC.get());
 
 	PORTD |= 0x04;
     DDRD &=~ 0x04;
+	RTC.set33kHzOutput(false);
+	RTC.clearAlarmFlag(3);
+	RTC.setSQIMode(sqiModeAlarm1);
 }
 
 void loop()
@@ -87,10 +91,12 @@ void loop()
 		power->powerDown();
 
 		//If this did not power down we will use on board power management.
+		debug->println("Still powered up, using backup sleep.");
 		delay(300);
 		backup_sleep();
 	}else
 	{
+		debug->println("Power Down Error");
 		if(!repeat(&power_gizmo_error, 5, 100))
 		{
 			debug->println("Failed send power gizmo error.");
@@ -108,6 +114,13 @@ void backup_sleep()
 
 	tmElements_t alarm;
 	wake_up_at(RTC.get(), alarm);
+	debug->print("Current Time: ");
+	displayDate(RTC.get(), debug);
+	debug->println();
+	debug->print("Wake At: ");
+	displayDate(alarm, debug);
+	debug->println();
+	RTC.clearAlarmFlag(3);
 	RTC.writeAlarm(1, alarmModeDateMatch, alarm);
 	attachInterrupt(0, INT0_ISR, FALLING);
 
@@ -128,6 +141,9 @@ void backup_sleep()
 	did_backup_sleep = true;
 	RTC.clearAlarmFlag(3);
 	power->set(RTC.get());
+	debug->print("Woke up at: ");
+	displayDate(RTC.get(), debug);
+	debug->println();
 }
 
 time_t wake_up_at(time_t current_time, tmElements_t &alarm)
@@ -291,4 +307,33 @@ int freeRam () {
   extern int __heap_start, *__brkval;
   int v;
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
+void displayDate(time_t time, Stream* displayOn)
+{
+	tmElements_t tm;
+	breakTime(time, tm);
+	displayDate(tm, displayOn);
+}
+
+void displayDate(tmElements_t &time, Stream* displayOn)
+{
+    char slash = '/';
+    char colan = ':';
+	displayOn->print(tmYearToCalendar(time.Year), DEC);
+    displayOn->print(slash);
+    LEADING_ZERO(displayOn, time.Month);
+    displayOn->print(time.Month, DEC);
+    displayOn->print(slash);
+    LEADING_ZERO(displayOn, time.Day);
+    displayOn->print(time.Day, DEC);
+    displayOn->print(slash);
+    LEADING_ZERO(displayOn, time.Hour);
+    displayOn->print(time.Hour, DEC);
+    displayOn->print(':');
+    LEADING_ZERO(displayOn, time.Minute);
+    displayOn->print(time.Minute, DEC);
+    displayOn->print(colan);
+    LEADING_ZERO(displayOn, time.Second);
+    displayOn->print(time.Second, DEC);
 }

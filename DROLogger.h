@@ -41,9 +41,11 @@
 #define ONE_WIRE_BUS_TWO_PIN A1
 #define POWER_CONTROL_PIN    A2
 
+#define LEADING_ZERO(STREAM, value) if(value < 10){STREAM->print(0);}
+
 #ifndef sleep_bod_disable()
 #define sleep_bod_disable() \
-do { \
+{ \
   uint8_t tempreg; \
   __asm__ __volatile__("in %[tempreg], %[mcucr]" "\n\t" \
                        "ori %[tempreg], %[bods_bodse]" "\n\t" \
@@ -54,7 +56,7 @@ do { \
                        : [mcucr] "I" _SFR_IO_ADDR(MCUCR), \
                          [bods_bodse] "i" (_BV(BODS) | _BV(BODSE)), \
                          [not_bodse] "i" (~_BV(BODSE))); \
-} while (0)
+}
 #endif
 
 
@@ -73,6 +75,8 @@ time_t wake_up_at(time_t current_time, tmElements_t &alarm);
 
 bool repeat(bool (*func)(int repeat_count), uint32_t count, uint32_t delayms);
 int freeRam();
+void displayDate(time_t time, Stream* displayOn);
+void displayDate(tmElements_t &time, Stream* displayOn);
 
 enum message_t
 {
