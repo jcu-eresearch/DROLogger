@@ -244,9 +244,9 @@ void log_temperature(uint8_t bus, uint8_t *address)
 	record_t record;
 	record.value = temps[bus]->getTempC(address);
 	memcpy(&record.address, address, 8);
-	if(temps[bus]->getResolution(address) != TEMP_12_BIT)
+	if(temps[bus]->getResolution(address) != 12)
 	{
-		temps[bus]->setResolution(address, TEMP_12_BIT);
+		temps[bus]->setResolution(address, 12);
 	}
 
 	data->write((uint8_t*)&record, sizeof(record_t));
