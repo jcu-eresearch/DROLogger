@@ -46,7 +46,7 @@ void setup()
 	Serial.begin(9600);
 	data = &Serial;
 	debug = new SoftwareSerial(8,9);
-	debug->begin(57600);
+	debug->begin(9600);
 	debug->println("Starting...");
 	busses[0] = new OneWire(ONE_WIRE_BUS_ONE_PIN);
 	busses[1] = new OneWire(ONE_WIRE_BUS_TWO_PIN);
@@ -75,12 +75,15 @@ void loop()
 {
 
 	power_up_radio();
-	digitalWrite(POWER_CONTROL_PIN, HIGH);
+	power_up_devices();
+	clear_input();
+
 	if(!repeat(&dro_log, 5, 100))
 	{
 		debug->println("Failed to send data.");
 	}
-	digitalWrite(POWER_CONTROL_PIN, LOW);
+
+	power_down_devices();
 	power_down_radio();
 
 	ab08xx_tmElements_t alarm;
@@ -158,14 +161,38 @@ time_t wake_up_at(time_t current_time, tmElements_t &alarm)
 	return waking_at;
 }
 
-void power_down_radio()
+void power_up_devices()
 {
+	debug->println("Powering up devices.");
+	pinMode(POWER_CONTROL_PIN, OUTPUT);
+	digitalWrite(POWER_CONTROL_PIN, HIGH);
+	delay(1000);
+}
 
+void power_down_devices()
+{
+	debug->println("Powering down devices.");
+	digitalWrite(POWER_CONTROL_PIN, LOW);
 }
 
 void power_up_radio()
 {
+	pinMode(POWERBEE_CONTROL_PIN, OUTPUT);
+	digitalWrite(POWERBEE_CONTROL_PIN, HIGH);
+	delay(500);
+}
 
+void power_down_radio()
+{
+	digitalWrite(POWERBEE_CONTROL_PIN, LOW);
+}
+
+void clear_input()
+{
+	while(data->available())
+	{
+		data->read();
+	}
 }
 
 bool dro_log(int repeat_count)
@@ -286,6 +313,10 @@ void log_address(Stream* stream, uint8_t *address)
 {
 	for(int i = 0; i < 8; i++)
 	{
+		if(address[i] < 0x10)
+		{
+			stream->print(0, HEX);
+		}
 		stream->print(address[i], HEX);
 	}
 }

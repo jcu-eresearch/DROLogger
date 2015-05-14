@@ -40,6 +40,7 @@
 #define ONE_WIRE_BUS_ONE_PIN A0
 #define ONE_WIRE_BUS_TWO_PIN A1
 #define POWER_CONTROL_PIN    A2
+#define POWERBEE_CONTROL_PIN  5
 
 #define LEADING_ZERO(STREAM, value) if(value < 10){STREAM->print(0);}
 
@@ -68,7 +69,10 @@ void log_temperature(uint8_t bus, uint8_t *address);
 void log_humidity(uint8_t bus, uint8_t *address);
 void log_address(Stream* stream, uint8_t *address);
 void backup_sleep();
+void power_up_devices();
+void power_down_devices();
 void power_down_radio();
+void clear_input();
 void power_up_radio();
 void INT0_ISR();
 time_t wake_up_at(time_t current_time, tmElements_t &alarm);
