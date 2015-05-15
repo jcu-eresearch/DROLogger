@@ -73,7 +73,8 @@ void setup()
 
 void loop()
 {
-
+	debug->print("COLLISION_AVOID_INTERVAL: ");
+	debug->println(COLLISION_AVOID_INTERVAL);
 	power_up_radio();
 	power_up_devices();
 	clear_input();
@@ -155,7 +156,7 @@ time_t wake_up_at(time_t current_time, tmElements_t &alarm)
 	time_t waking_at = current_time - (current_time % LOG_INTERVAL) + LOG_INTERVAL;
 	if((waking_at - current_time) < LOG_INTERVAL_THRESHOLD)
 	{
-		waking_at += LOG_INTERVAL;
+		waking_at += LOG_INTERVAL + COLLISION_AVOID_INTERVAL;
 	}
 	breakTime(waking_at, alarm);
 	return waking_at;
