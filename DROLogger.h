@@ -26,6 +26,8 @@
 #include "AB08XX_I2C.h"
 #include "PowerGizmo.h"
 
+#include "DROLoggerBoard.h"
+
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <avr/power.h>
@@ -36,13 +38,10 @@
 #define ACK "OK"
 #define LOG_INTERVAL 600
 #define LOG_INTERVAL_THRESHOLD 10
-#define NODE_ID 0
+#define NODE_ID 2
 #define COLLISION_AVOID_INTERVAL (NODE_ID * 60)
 
-#define ONE_WIRE_BUS_ONE_PIN A0
-#define ONE_WIRE_BUS_TWO_PIN A1
-#define POWER_CONTROL_PIN    A2
-#define POWERBEE_CONTROL_PIN  5
+
 
 #define LEADING_ZERO(STREAM, value) if(value < 10){STREAM->print(0);}
 

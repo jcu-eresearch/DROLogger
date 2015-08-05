@@ -45,7 +45,7 @@ void setup()
 	}
 	Serial.begin(9600);
 	data = &Serial;
-	debug = new SoftwareSerial(8,9);
+	debug = new SoftwareSerial(DEBUG_RX_PIN, DEBUG_TX_PIN);
 	debug->begin(9600);
 	debug->println("Starting...");
 	busses[0] = new OneWire(ONE_WIRE_BUS_ONE_PIN);
@@ -126,6 +126,7 @@ void backup_sleep()
 	debug->println();
 	RTC.clearAlarmFlag(3);
 	RTC.writeAlarm(1, alarmModeDateMatch, alarm);
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	attachInterrupt(0, INT0_ISR, FALLING);
 
     cli();
